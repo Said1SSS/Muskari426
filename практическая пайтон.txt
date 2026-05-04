@@ -1,0 +1,216 @@
+import time
+import json
+import getpass
+import os
+from datetime import datetime
+import matplotlib.pyplot as plt
+
+
+HOURLY_RATE = 1500  # Ставка в рублях за час
+USERS_FILE = "users.json"
+REPORTS_FILE = "reports.json"
+
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r') as f:
+            return json.load(f)
+    return []
+
+def save_users(users):
+    with open(USERS_FILE, 'w') as f:
+        json.dump(users, f, indent=4)
+
+def authorize():
+    users = load_users()
+    login = input("Введите логин: ")
+    password = getpass.getpass("Введите пароль: ")
+
+    for user in users:
+        if user['login'] == login and user['password'] == password:
+            print("✅ Авторизация успешна.")
+            return login
+    print("❌ Неверный логин или пароль.")
+    return None
+
+
+def register_user():
+    users = load_users()
+    new_login = input("Введите логин нового пользователя: ")
+    
+   
+    if any(user['login'] == new_login for user in users):
+        print("❌ Пользователь с таким логином уже существует.")
+        return
+
+    new_password = getpass.getpass("Введите пароль: ")
+    confirm_password = getpass.getpass("Подтвердите пароль: ")
+
+    if new_password != confirm_password:
+        print("❌ Пароли не совпадают.")
+        return
+
+    users.append({"login": new_login, "password": new_password})
+    save_users(users)
+    print(f"✅ Пользователь '{new_login}' успешно зарегистрирован.")
+
+
+def track_work_time(username):
+    print("\n--- УЧЁТ РАБОЧЕГО ВРЕМЕНИ ---")
+    print("Нажмите Enter, чтобы начать смену...")
+    input()
+    
+    start_time = time.time()
+    print("🕒 Работа началась. Чтобы завершить смену, нажмите Enter снова...")
+    
+    try:
+        input() # Ожидание завершения работы
+    except KeyboardInterrupt:
+        pass
+
+    end_time = time.time()
+    duration_sec = int(end_time - start_time)
+    
+    print(f"⏱ Смена завершена. Отработано: {duration_sec} секунд.")
+    
+   
+    save_work_report(username, duration_sec)
+    
+    return duration_sec
+
+
+def load_reports():
+    if os.path.exists(REPORTS_FILE):
+        with open(REPORTS_FILE, 'r') as f:
+            return json.load(f)
+    return []
+
+def save_work_report(username, duration_sec):
+    reports = load_reports()
+    
+    report_entry = {
+        "login": username,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "duration_sec": duration_sec,
+        "salary": calculate_salary(duration_sec)
+    }
+    
+    reports.append(report_entry)
+    
+    with open(REPORTS_FILE, 'w') as f:
+        json.dump(reports, f, indent=4)
+
+
+def calculate_salary(duration_sec):
+    hours = duration_sec / 3600
+    salary = hours * HOURLY_RATE
+    return round(salary, 2)
+
+
+def view_reporting():
+    reports = load_reports()
+    
+    if not reports:
+        print("📂 Нет данных для отчета.")
+        return
+
+    print("\n--- ОТЧЁТ ПО ЗАРПЛАТАМ ---")
+    
+    
+    salary_summary = {}
+    
+    for report in reports:
+        key = (report['login'], report['date'][:10]) # Группировка по дате (без времени)
+        salary_summary[key] = salary_summary.get(key, 0) + report['salary']
+
+    for (login, date), total_salary in salary_summary.items():
+        print(f"{login} - {total_salary} руб. (Дата: {date})")
+
+
+def show_analytics():
+    reports = load_reports()
+    
+    if not reports:
+        print("📉 Недостаточно данных для построения графика.")
+        return
+
+   
+    df_data = []
+    
+    for report in reports:
+        df_data.append({
+            'Дата': report['date'][:10],
+            'Зарплата': report['salary']
+        })
+
+    import pandas as pd
+    
+    df = pd.DataFrame(df_data)
+    
+    
+    grouped_df = df.groupby('Дата').sum().reset_index()
+
+    plt.figure(figsize=(10, 5))
+    plt.bar(grouped_df['Дата'], grouped_df['Зарплата'], color='teal')
+    plt.title('Суммарная заработная плата по дням')
+    plt.xlabel('Дата')
+    plt.ylabel('Заработная плата (руб.)')
+    plt.grid(axis='y', alpha=0.75)
+    
+  
+    for i, value in enumerate(grouped_df['Зарплата']):
+        plt.text(i, value + 500, f"{int(value)}", ha='center')
+        
+    plt.tight_layout()
+    plt.show()
+
+
+def main():
+    current_user = None
+
+    while True:
+        if current_user:
+            # Меню авторизованного пользователя (работника)
+            print(f"\n🔐 Вы вошли как: {current_user}")
+            print("1. Начать смену (учёт времени)")
+            print("2. Выйти из аккаунта")
+            
+            choice = input("Ваш выбор: ")
+            
+            if choice == '1':
+                duration = track_work_time(current_user)
+                salary = calculate_salary(duration)
+                print(f"💰 Ваша зарплата за смену: {salary} руб.")
+                
+            elif choice == '2':
+                current_user = None
+                print("Вы вышли из системы.")
+            else:
+                continue
+
+        else:
+            # Меню гостя / администратора
+            print("\n🔑 МЕНЮ ВХОДА")
+            print("1. Авторизация")
+            print("2. Регистрация нового пользователя")
+            print("3. Просмотр отчетности (Админ)")
+            print("4. Аналитика и графики (Админ)")
+            print("5. Выход из программы")
+            
+            choice = input("Ваш выбор: ")
+            
+            if choice == '1':
+                current_user = authorize()
+            elif choice == '2':
+                register_user()
+            elif choice == '3':
+                view_reporting()
+            elif choice == '4':
+                show_analytics()
+            elif choice == '5':
+                break
+            else:
+                continue
+
+if __name__ == "__main__":
+    main()
