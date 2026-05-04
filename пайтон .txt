@@ -1,0 +1,62 @@
+import os
+
+def display_file_content():
+    while True:
+        path = input("Введите путь к файлу: ")
+        if not os.path.isfile(path):
+            print("Указанный файл не найден, проверьте корректность указанного пути")
+        else:
+            try:
+                with open(path, 'r', encoding='utf-8') as file:
+                    print("nСодержимое файла:n")
+                    for line in file:
+                        print(line.rstrip('n'))
+                print("n----- Конец файла -----n")
+            except Exception as e:
+                print(f"Ошибка при чтении файла: {e}")
+            break
+   
+    print_menu()
+
+def create_and_save_file():
+    print("Создание нового файла.")
+    lines = []
+    print("Введите строки текста. Для завершения ввода введите пустую строку.")
+    while True:
+        line = input()
+        if line == '':
+            break
+        lines.append(line)
+    save_path = input("Введите путь для сохранения файла: ")
+
+    try:
+        with open(save_path, 'w', encoding='utf-8') as file:
+            for line in lines:
+                file.write(line + 'n')
+        print("Файл успешно сохранён.")
+    except Exception as e:
+        print(f"Ошибка при сохранении файла: {e}")
+
+    print_menu()
+
+def print_menu():
+    while True:
+        print("nМеню:")
+        print("1. Отобразить содержимое файла")
+        print("2. Создать и сохранить новый файл")
+        print("3. Выйти")
+        choice = input("Выберите действие (1-3): ")
+        if choice == '1':
+            display_file_content()
+            break
+        elif choice == '2':
+            create_and_save_file()
+            break
+        elif choice == '3':
+            print("Выход из программы.")
+            break
+        else:
+            print("Некорректный выбор, попробуйте снова.")
+
+if __name__ == "__main__":
+    print_menu()
